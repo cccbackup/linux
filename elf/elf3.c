@@ -6,11 +6,11 @@ void print_ehdr(Elf64_Ehdr ehdr) {
   printf("============== ehdr ==================\n");
   printf("e_type=%d\n", ehdr.e_type);
   printf("e_machine=%d\n", ehdr.e_machine);
-  printf("e_version=%d\n", ehdr.e_version);
-  printf("e_entry=%ld\n", ehdr.e_entry);
+  printf("e_version=0x%x\n", ehdr.e_version);
+  printf("e_entry=0x%lx\n", ehdr.e_entry);
   printf("e_phoff=%ld\n", ehdr.e_phoff);
   printf("e_shoff=%ld\n", ehdr.e_shoff);
-  printf("e_flags=%d\n", ehdr.e_flags);
+  printf("e_flags=0x%x\n", ehdr.e_flags);
   printf("e_ehsize=%d\n", ehdr.e_ehsize);
   printf("e_phentsize=%d\n", ehdr.e_phentsize);
   printf("e_phnum=%d\n", ehdr.e_phnum);
@@ -19,37 +19,41 @@ void print_ehdr(Elf64_Ehdr ehdr) {
   printf("e_shstrndx=%d\n", ehdr.e_shstrndx);
 }
 
-void print_shdr(Elf64_Shdr shdr) {
-  printf("============== shdr ==================\n");
-  printf("sh_name=%d\n", shdr.sh_name);
-  printf("sh_type=%d\n", shdr.sh_type);
-  printf("sh_flags=%ld\n", shdr.sh_flags);
-  printf("sh_addr=%ld\n", shdr.sh_addr);
-  printf("sh_offset=%ld\n", shdr.sh_offset);
-  printf("sh_size=%ld\n", shdr.sh_size);
-  printf("sh_link=%d\n", shdr.sh_link);
-  printf("sh_info=%d\n", shdr.sh_info);
-  printf("sh_addralign=%ld\n", shdr.sh_addralign);
-  printf("sh_entsize=%ld\n", shdr.sh_entsize);
+void print_shdr(FILE *file, Elf64_Ehdr ehdr) {
+  // Section Headers:
+  //   [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al
+  //   [ 0]                   NULL            0000000000000000 000000 000000 00      0   0  0
+  //   [ 1] .interp           PROGBITS        0000000000000238 000238 00001c 00   A  0   0  1
+  printf("Section Headers:\n");
+  printf("  [Nr] Name              Type            Address          Off    Size   ES Flg Lk Inf Al\n");
+  fseek(file, ehdr.e_shoff, SEEK_SET);
+
+  for (int i=0; i < ehdr.e_shnum; i++) {
+    Elf64_Shdr shdr;
+    fread(&shdr, 1, sizeof(shdr), file);
+    printf("       %-17x %-15x %016lx %06lx %06lx %02lx %3lx %2d %3d %2ld\n", shdr.sh_name, shdr.sh_type, shdr.sh_addr, shdr.sh_offset, shdr.sh_size, shdr.sh_entsize, shdr.sh_flags, shdr.sh_link, shdr.sh_info, shdr.sh_addralign);
+  }
 }
 
-void print_phdr(Elf64_Phdr phdr) {
-  printf("============== phdr ==================\n");
-  printf("p_type=%d\n", phdr.p_type);
-  printf("p_offset=%ld\n", phdr.p_offset);
-  printf("p_vaddr=%ld\n", phdr.p_vaddr);
-  printf("p_paddr=%ld\n", phdr.p_paddr);
-  printf("p_filesz=%ld\n", phdr.p_filesz);
-  printf("p_memz=%ld\n", phdr.p_memsz);
-  printf("p_flags=%d\n", phdr.p_flags);
-  printf("p_align=%ld\n", phdr.p_align);
+void print_phdr(FILE *file, Elf64_Ehdr ehdr) {
+// Program Headers:
+//   Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+//   PHDR           0x000040 0x0000000000000040 0x0000000000000040 0x0001f8 0x0001f8 R   0x8
+//   INTERP         0x000238 0x0000000000000238 0x0000000000000238 0x00001c 0x00001c R   0x1
+  printf("Program Headers:\n");
+  printf("  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align\n");
+  fseek(file, ehdr.e_phoff, SEEK_SET);
+
+  for (int i=0; i < ehdr.e_shnum; i++) {
+    Elf64_Phdr phdr;
+    fread(&phdr, 1, sizeof(phdr), file);
+    printf("  %-14x 0x%06lx 0x%016lx 0x%016lx 0x%06lx 0x%06lx %3x 0x%lx\n", phdr.p_type, phdr.p_offset, phdr.p_vaddr, phdr.p_paddr, phdr.p_filesz, phdr.p_memsz, phdr.p_flags, phdr.p_align);
+  }
 }
 
 void read_elf(const char* elfFile) {
   // switch to Elf32_Ehdr for x86 architecture.
   Elf64_Ehdr ehdr;
-  Elf64_Shdr shdr;
-  Elf64_Phdr phdr;
   Elf64_Sym  sym;
   Elf64_Rela rela;
 
@@ -62,14 +66,8 @@ void read_elf(const char* elfFile) {
     if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) == 0) {
        // this is a valid elf file
        print_ehdr(ehdr);
-
-       fseek(file, ehdr.e_shoff, SEEK_END);
-       fread(&shdr, 1, sizeof(shdr), file);
-       print_shdr(shdr);
-
-       fseek(file, ehdr.e_phoff, SEEK_SET);
-       fread(&phdr, 1, sizeof(phdr), file);
-       print_phdr(phdr);
+       print_shdr(file, ehdr);
+       print_phdr(file, ehdr);
     }
 
     // finally close the file
@@ -80,5 +78,5 @@ void read_elf(const char* elfFile) {
 
 
 int main() {
-  read_elf("elf2");
+  read_elf("elf3");
 }
